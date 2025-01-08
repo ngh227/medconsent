@@ -15,3 +15,17 @@ project/
 
 template ID: 2a7a38a8-8d2e-4e20-81e6-c2e26dcd9991
 accountId: 2c4fb37d-f2db-4a85-a65d-56eca45745a7
+envelopeId: 
+
+src/
+├── components/
+│   ├── ConsentForm/
+│   │   ├── PatientConsent.tsx      # Main consent form
+│   │   ├── LanguageSelector.tsx    # Language selection
+│   │   └── UnderstandingCheck.tsx  # Verification questions
+│   └── Analytics/
+│       └── ConsentMetrics.tsx      # Staff analytics view
+├── services/
+│   └── docusign.ts                 # API integration
+├── App.tsx
+└── index.tsx
