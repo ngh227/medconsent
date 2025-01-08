@@ -1,3 +1,6 @@
 .env
 private.key
 .rdb
+note 
+node_modules
+*.rdb
