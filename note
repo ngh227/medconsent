@@ -1,0 +1,17 @@
+project/
+  ├── backend/                # Chứa code Node.js + Express 
+  │   ├── src/
+  │   │   ├── routes/        # Chứa các API routes
+  │   │   ├── utils/         # Chứa các hàm tiện ích
+  │   │   └── index.js       # File khởi động server
+  │   └── package.json
+  │
+  └── frontend/              # Chứa code React
+      ├── src/
+      │   ├── components/    # Các React components
+      │   ├── pages/         # Các trang React
+      │   └── App.js         # Component chính
+      └── package.json
+
+template ID: 2a7a38a8-8d2e-4e20-81e6-c2e26dcd9991
+accountId: 2c4fb37d-f2db-4a85-a65d-56eca45745a7

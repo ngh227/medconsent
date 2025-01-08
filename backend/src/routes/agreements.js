@@ -129,6 +129,7 @@ router.get('/agreements/:envelopeId/status', checkAuth, async (req, res) => {
     }
 });
 
+// upload feature
 router.post('/templates/upload', checkAuth, upload.single('file'), async(req, res) => {
     try {
         const { name, description } = req.body;
@@ -152,11 +153,30 @@ router.post('/templates/upload', checkAuth, upload.single('file'), async(req, re
         const doc = new docusign.Document();
         doc.documentBase64 = base64File;
         doc.name = file.originalname;
-        doc.fileExtention = file.originalname.split('.').pop();
+        doc.fileExtension = file.originalname.split('.').pop();
         doc.documentId = '1';
-    } catch (error) {
 
+        // Complete these parts:
+        templateDefinition.documents = [doc];
+        
+        // Create template in DocuSign
+        const templatesApi = new docusign.TemplatesApi(apiClient);
+        const results = await templatesApi.createTemplate(req.session.accountId, {
+            envelopeTemplate: templateDefinition
+        });
+
+        res.json({
+            templateId: results.templateId,
+            name: results.name,
+            status: 'created'
+        });
+    } catch (error) {
+        console.error('Error creating template:', error);
+        res.status(500).json({
+            error: 'Cannot create template',
+            details: error.message
+        });
     }
-})
+});
 
 module.exports = router;
