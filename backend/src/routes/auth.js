@@ -75,6 +75,7 @@ router.get('/auth/callback', async (req, res) => {
 
         // Store tokens in session
         req.session.accessToken = response.accessToken;
+        req.session.accountId = response.accountId;
         req.session.refreshToken = response.refreshToken;
 
         // Get user info

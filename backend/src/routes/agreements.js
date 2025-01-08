@@ -28,13 +28,19 @@ const getDocuSignClient = (accessToken, basePath) => {
 // API endpoint to send new agreement
 router.post('/agreements/send', checkAuth, async (req, res) => {
     try {
-        const { recipientEmail, recipientName, templateID } = req.body;
+        const { recipientEmail, recipientName, templateId } = req.body;
 
-        if(!recipientEmail || !recipientName || !templateID) {
+        if(!recipientEmail || !recipientName || !templateId) {
             return res.status(400).json( {
                 error: 'Missing required information'
             });
         }
+
+        console.log('Session data:', {
+            accessToken: !!req.session.accessToken,
+            accountId: req.session.accountId
+        });
+        console.log('Session data:', req.session);
 
         const apiClient = getDocuSignClient(
             req.session.accessToken, 
@@ -45,23 +51,35 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
 
         // create envelope from template
         const envelopeDefinition = new docusign.EnvelopeDefinition();
-        envelopeDefinition.templateId = templateID;
+        console.log('Using template ID:', templateId);
+        envelopeDefinition.templateId = templateId;
 
         // set up reciever / signer
         const signer = docusign.TemplateRole.constructFromObject({
             email: recipientEmail,
             name: recipientName,
-            roleName: 'signer'
+            roleName: 'Signer 1'
         });
 
         envelopeDefinition.templateRoles = [signer];
         envelopeDefinition.status = 'sent';
 
+        console.log('Creating envelope with account ID:', req.session.accountId);
+
         // send envelope
         const results = await envelopesApi.createEnvelope(
-            req.session.accessId,
+            req.session.accountId,
             { envelopeDefinition }
         );
+
+        if (!req.session.envelopes){
+            req.session.envelopes = [];
+        }
+        req.session.envelopes.push({
+            envelopeId: results.envelopeId,
+            status: results.status,
+            createdAt: results.statusDateTime
+        })
 
         res.json({
             envelopeId: results.envelopeId,
@@ -78,9 +96,10 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
 });
 
 // API endpoint to get an envelope's ID
-router.get('/agreemetns/:envelopeId/status', checkAuth, async (req, res) => {
+router.get('/agreements/:envelopeId/status', checkAuth, async (req, res) => {
     try {
         const { envelopeId } = req.params; // get ID from URL
+
         const apiClient = getDocuSignClient (
             req.session.accessToken,
             API_BASE_PATH
@@ -121,7 +140,7 @@ router.post('/templates/upload', checkAuth, upload.single('file'), async(req, re
         );
 
         // read file
-        const fileBuffer = await fs.readFile(file.paht);
+        const fileBuffer = await fs.readFile(file.path);
         const base64File = fileBuffer.toString('base64');
 
         // create template definition
