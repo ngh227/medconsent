@@ -7,21 +7,25 @@ const { createClient } = require('redis');
 const RedisStore = require('connect-redis').default;
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
+const mongoose = require('mongoose');
 
-const authRoutes = require('./src/routes/auth');
-const agreementRoutes = require('./src/routes/agreements');
+const authRoutes = require('./src/routes/auth/auth.routes');
+const agreementRoutes = require('./src/routes/api/agreements.routes');
+const staffAuthRoutes = require('./src/routes/auth/staff.routes');
+const patientAuthRoutes = require('./src/routes/auth/patient.routes');
 
 const app = express();
 const PORT = 3000;
 
-// Đầu file index.js
-console.log('Loaded environment:', {
-    AUTH_SERVER: process.env.AUTH_SERVER ? 'set' : 'not set',
-    CLIENT_ID: process.env.CLIENT_ID ? 'set' : 'not set',
-    REDIRECT_URI: process.env.REDIRECT_URI ? 'set' : 'not set'
+console.log('Environment variables loaded:', {
+  AUTH_SERVER: process.env.AUTH_SERVER ? 'set' : 'not set',
+  CLIENT_ID: process.env.CLIENT_ID ? 'set' : 'not set',
+  REDIRECT_URI: process.env.REDIRECT_URI ? 'set' : 'not set'
 });
 
 app.use(bodyParser.json());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // create a new Redis client instance
 const redisClient = createClient({
@@ -60,6 +64,21 @@ app.use(session({
     maxAge: 1000 * 60 * 60 // 1h in millisec
   }
 }));
+
+// Use routes
+app.use('/api', staffAuthRoutes);
+app.use('/api', patientAuthRoutes);
+// app.use('/api', agreementRoutes);
+
+// Add a test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API is working' });
+});
+
+// MONGODB CONNECTION
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 app.use('/api', authRoutes);
 app.use('/api', agreementRoutes);
