@@ -6,6 +6,7 @@ const docusign = require('docusign-esign');
 
 const User = require('../../models/user.model');
 const Consent = require('../../models/consent.model');
+const EnvelopeService = require('../../services/docusign/envelope.service');
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -37,90 +38,78 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
     try {
         const { recipientEmail, recipientName, templateId } = req.body;
         if(!recipientEmail || !recipientName || !templateId) {
-            return res.status(400).json( {
+            return res.status(400).json({
                 error: 'Missing required information'
             });
         }
-        const apiClient = getDocuSignClient(
-            req.session.accessToken, 
-            API_BASE_PATH
+
+        console.log('Validated session:', {
+            accessToken: !!req.session.accessToken,
+            accountId: req.session.accountId
+        });
+
+        // Find patient in database
+        const patient = await User.findOne({ 
+            email: recipientEmail,
+            role: 'patient'
+        });
+    
+        if (!patient) {
+            return res.status(404).json({ error: 'Patient not found' });
+        }
+
+        console.log('Creating envelope with:', {
+            accountId: req.session.accountId,
+            templateId,
+            recipientEmail
+        });
+    
+        // Use EnvelopeService to create envelope
+        const results = await EnvelopeService.createEnvelope(
+            req.session.accountId,
+            templateId,
+            recipientEmail,
+            recipientName,
+            req.session.accessToken
         );
-        const envelopesApi = new docusign.EnvelopesApi(apiClient);
-
-    console.log('Validated session:', {
-        accessToken: !!req.session.accessToken,
-        accountId: req.session.accountId
-    });
-
-      // Find patient in database
-      const patient = await User.findOne({ 
-        email: recipientEmail,
-        role: 'patient'
-      });
-  
-      if (!patient) {
-        return res.status(404).json({ error: 'Patient not found' });
-      }
-  
-      // Create envelope from template
-      const envelopeDefinition = new docusign.EnvelopeDefinition();
-      envelopeDefinition.templateId = templateId;
-  
-      const signer = docusign.TemplateRole.constructFromObject({
-        email: recipientEmail,
-        name: recipientName,
-        roleName: 'Signer 1'
-      });
-  
-      envelopeDefinition.templateRoles = [signer];
-      envelopeDefinition.status = 'sent';
-
-      console.log('Creating envelope with:', {
-        accountId: req.session.accountId,
-        templateId,
-        recipientEmail
-    });
-  
-      const results = await envelopesApi.createEnvelope(
-        req.session.accountId,
-        { envelopeDefinition }
-      );
-  
-      // Save consent record
-      await Consent.create({
-        patientId: patient._id,
-        envelopeId: results.envelopeId,
-        templateId,
-        sentBy: req.session.userId,
-        department: req.user?.department || 'General'
-      });
-  
-      res.json({
-        envelopeId: results.envelopeId,
-        status: results.status,
-        statusDateTime: results.statusDateTime
-      });
+    
+        // Save consent record
+        await Consent.create({
+            patientId: patient._id,
+            envelopeId: results.envelopeId,
+            templateId,
+            sentBy: req.session.userId,
+            department: req.user?.department || 'General'
+        });
+    
+        res.json({
+            envelopeId: results.envelopeId,
+            status: results.status,
+            statusDateTime: results.statusDateTime
+        });
     } catch (err) {
-      console.error('Error while sending agreement:', err);
-      res.status(500).json({
-        error: 'Cannot send agreement',
-        details: err.message
-      });
+        console.error('Error while sending agreement:', err);
+        res.status(500).json({
+            error: 'Cannot send agreement',
+            details: err.message
+        });
     }
-  });
+});
 
 // API endpoint to get agreement status
 router.get('/agreements/:envelopeId/status', checkAuth, async (req, res) => {
     try {
-      const status = await getEnvelopeStatus(
+      const status = await EnvelopeService.getEnvelopeStatus(
         req.session.accountId,
-        req.params.envelopeId
+        req.params.envelopeId,
+        req.session.accessToken
       );
       res.json(status);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   });
+
  //////////////////
 // upload feature
 router.post('/templates/upload', checkAuth, upload.single('file'), async(req, res) => {
