@@ -8,13 +8,23 @@ const authService = require('../../services/docusign/auth.service');
 
 // DocuSign JWT authentication
 router.get('/auth/jwt', async (req, res) => {
+const { code } = req.query;
   try {
     const result = await authService.getJWTToken();
+    req.session.accessToken = result.accessToken;
+    // ACCOUNT ID
+    const apiClient = new docusign.ApiClient();
+    apiClient.setOAuthBasePath(process.env.AUTH_SERVER);
+    const userInfo = await apiClient.getUserInfo(result.accessToken);
+    req.session.accountId = userInfo.accounts[0].accountId;
+
+    // ACCESS TOKEN
     res.json({
       success: true,
       access_token: result.accessToken,
       expires_in: result.expiresIn
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -27,12 +37,11 @@ router.get('/auth/jwt', async (req, res) => {
 router.get('/auth/callback', async (req, res) => {
   const { code } = req.query;
   try {
-    console.log('Processing OAuth callback...');
+    console.log('Received code:', code);
     
     const apiClient = new docusign.ApiClient();
     apiClient.setOAuthBasePath(process.env.AUTH_SERVER);
     
-    // Generate access token
     const response = await apiClient.generateAccessToken(
       process.env.CLIENT_ID,
       process.env.SECRET_KEY,
@@ -46,12 +55,10 @@ router.get('/auth/callback', async (req, res) => {
         throw new Error('No accounts found in user info');
     }
 
-    const accountId = userInfo.accounts[0].accountId;
-
-    // Set session data
-    req.session.accessToken = response.accessToken;
-    req.session.accountId = accountId;
+    // Save session data
     req.session.refreshToken = response.refreshToken;
+    req.session.accountId = userInfo.accounts[0].accountId;
+    
 
     console.log('Session updated with:', {
         accessToken: !!req.session.accessToken,
