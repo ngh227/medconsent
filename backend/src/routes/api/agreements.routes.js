@@ -35,20 +35,23 @@ const getDocuSignClient = (accessToken, basePath) => {
 
 router.post('/agreements/send', checkAuth, async (req, res) => {
     try {
-      const { recipientEmail, recipientName, templateId } = req.body;
-      console.log('Sending agreement - Session state:', {
-        hasSession: !!req.session,
-        accessToken: !!req.session?.accessToken,
-        accountId: req.session?.accountId || 'NOT SET',
-        userId: req.session?.userId,
-        reqBody: { recipientEmail, recipientName, templateId }
+        const { recipientEmail, recipientName, templateId } = req.body;
+        if(!recipientEmail || !recipientName || !templateId) {
+            return res.status(400).json( {
+                error: 'Missing required information'
+            });
+        }
+        const apiClient = getDocuSignClient(
+            req.session.accessToken, 
+            API_BASE_PATH
+        );
+        const envelopesApi = new docusign.EnvelopesApi(apiClient);
+
+    console.log('Validated session:', {
+        accessToken: !!req.session.accessToken,
+        accountId: req.session.accountId
     });
-      if(!recipientEmail || !recipientName || !templateId) {
-        return res.status(400).json({ 
-          error: 'Missing required information' 
-        });
-      }
-  
+
       // Find patient in database
       const patient = await User.findOne({ 
         email: recipientEmail,
@@ -58,13 +61,6 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
       if (!patient) {
         return res.status(404).json({ error: 'Patient not found' });
       }
-  
-      const apiClient = getDocuSignClient(
-        req.session.accessToken, 
-        API_BASE_PATH
-      );
-  
-      const envelopesApi = new docusign.EnvelopesApi(apiClient);
   
       // Create envelope from template
       const envelopeDefinition = new docusign.EnvelopeDefinition();
