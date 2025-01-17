@@ -7,6 +7,7 @@ const docusign = require('docusign-esign');
 const User = require('../../models/user.model');
 const Consent = require('../../models/consent.model');
 const EnvelopeService = require('../../services/docusign/envelope.service');
+const {  findUserById, addConsentToPatient, getAllPatients } = require('../../services/user.service');
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -37,50 +38,60 @@ const getDocuSignClient = (accessToken, basePath) => {
 router.post('/agreements/send', checkAuth, async (req, res) => {
     try {
         const { recipientEmail, recipientName, templateId } = req.body;
+        const accountId = req.session.accountId;
+        const accessToken = req.session.accessToken;
+
         if(!recipientEmail || !recipientName || !templateId) {
             return res.status(400).json({
                 error: 'Missing required information'
             });
         }
 
-        console.log('Validated session:', {
-            accessToken: !!req.session.accessToken,
-            accountId: req.session.accountId
-        });
-
-        // Find patient in database
-        const patient = await User.findOne({ 
-            email: recipientEmail,
-            role: 'patient'
-        });
-    
-        if (!patient) {
-            return res.status(404).json({ error: 'Patient not found' });
+        if (!accountId || !accessToken) {
+            return res.status(401).json({
+                error: 'Unauthorized: Missing accountId or accessToken'
+            });
         }
 
-        console.log('Creating envelope with:', {
-            accountId: req.session.accountId,
-            templateId,
-            recipientEmail
-        });
+        // ADDED: Check if patient exist, if not create one:
+        let patient = await User.findOne({ email: recipientEmail, role: 'patient' });
+        if (!patient) {
+            console.log(`Patient not found, creating new patient with email: ${recipientEmail}`);
+            patient = new User({
+                email: recipientEmail,
+                name: recipientName,
+                role: 'patient',
+                consents: []
+            });
+            await patient.save();
+        }
     
         // Use EnvelopeService to create envelope
-        const results = await EnvelopeService.createEnvelope(
-            req.session.accountId,
-            templateId,
-            recipientEmail,
-            recipientName,
-            req.session.accessToken
-        );
+        let results;
+        try {
+            results = await EnvelopeService.createEnvelope(
+                accountId,
+                templateId,
+                recipientEmail,
+                recipientName,
+                accessToken
+            );
+        } catch (err) {
+            console.error('Error while creating envelope:', err);
+            throw new Error('Failed to send agreement via DocuSign');
+        }
     
         // Save consent record
-        await Consent.create({
+        const consent = new Consent({
             patientId: patient._id,
             envelopeId: results.envelopeId,
             templateId,
             sentBy: req.session.userId,
-            department: req.user?.department || 'General'
+            department: req.user?.department || 'General',
+            status: 'sent',
+            sentAt: new Date()
         });
+        await consent.save();
     
         res.json({
             envelopeId: results.envelopeId,

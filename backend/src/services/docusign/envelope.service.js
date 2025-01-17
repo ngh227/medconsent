@@ -13,7 +13,8 @@ class EnvelopeService {
         return new docusign.EnvelopesApi(this.apiClient);
     }
 
-    async createEnvelope(accountId, templateId, recipientEmail, recipientName) {
+    async createEnvelope(accountId, templateId, recipientEmail, recipientName, accessToken) {
+        // accessToken added as parameter ^^^^^^^^^^^^^^
         const envelopeDefinition = new docusign.EnvelopeDefinition();
         envelopeDefinition.templateId = templateId;
 
@@ -34,7 +35,7 @@ class EnvelopeService {
         return results;
     }
 
-    async getEnvelopeStatus(accountId, envelopeId) {
+    async getEnvelopeStatus(accountId, envelopeId, accessToken) {
         const envelopesApi = this.initializeClient(accessToken);
         return await envelopesApi.getEnvelope(accountId, envelopeId);
     }

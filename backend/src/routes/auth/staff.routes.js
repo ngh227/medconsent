@@ -37,9 +37,15 @@ router.get('/auth/staff/callback', async (req, res) => {
             process.env.SECRET_KEY,
             code
         );
+        req.session.accessToken = response.accessToken;
+        req.session.refreshToken = response.refreshToken;
 
         // Get user info from DocuSign
         const userInfo = await apiClient.getUserInfo(response.accessToken);
+        req.session.userId = staffUser._id;
+        req.session.accountId = userInfo.accounts[0].accountId;
+        console.log('UserInfo Response:', JSON.stringify(userInfo, null, 2));
+        console.log(userInfo.accounts[0].accountId);
 
         // Find or create staff user
         let staffUser = await User.findOne({ email: userInfo.email });
@@ -53,10 +59,7 @@ router.get('/auth/staff/callback', async (req, res) => {
         }
 
         // Set session
-        req.session.userId = staffUser._id;
-        req.session.accessToken = response.accessToken;
-        req.session.refreshToken = response.refreshToken;
-        req.session.accountId = userInfo.accounts[0].accountId;
+
 
         res.redirect('/staff/dashboard');
     } catch (error) {
