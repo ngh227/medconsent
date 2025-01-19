@@ -5,9 +5,8 @@ const { checkAuth } = require('../../middleware/auth.middleware');
 const docusign = require('docusign-esign');
 
 const User = require('../../models/user.model');
-const Consent = require('../../models/consent.model');
 const EnvelopeService = require('../../services/docusign/envelope.service');
-const {  findUserById, addConsentToPatient, getAllPatients } = require('../../services/user.service');
+const {  addConsentToPatient, getPatientConsents, updateConsentStatus } = require('../../services/user.service');
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../../.env') });
@@ -15,17 +14,6 @@ const multer = require('multer');
 const upload = multer( {dest: 'uploads/' });
 
 const API_BASE_PATH = process.env.DOCUSIGN_BASE_PATH;
-
-router.use((req, res, next) => {
-    console.log('Session Debug [Time: ' + new Date().toISOString() + ']:', {
-        hasSession: !!req.session,
-        sessionID: req.sessionID,
-        accessToken: !!req.session?.accessToken,
-        accountId: req.session?.accountId || 'NOT SET',
-        userId: req.session?.userId
-    });
-    next();
-});
 
 // Create DocuSign API client
 const getDocuSignClient = (accessToken, basePath) => {
@@ -53,6 +41,15 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
             });
         }
 
+        // create envelope
+        const envelope = await EnvelopeService.createEnvelope(
+            accountId,
+            templateId,
+            recipientEmail,
+            recipientName,
+            accessToken
+        );
+
         // ADDED: Check if patient exist, if not create one:
         let patient = await User.findOne({ email: recipientEmail, role: 'patient' });
         if (!patient) {
@@ -65,38 +62,20 @@ router.post('/agreements/send', checkAuth, async (req, res) => {
             });
             await patient.save();
         }
-    
-        // Use EnvelopeService to create envelope
-        let results;
-        try {
-            results = await EnvelopeService.createEnvelope(
-                accountId,
-                templateId,
-                recipientEmail,
-                recipientName,
-                accessToken
-            );
-        } catch (err) {
-            console.error('Error while creating envelope:', err);
-            throw new Error('Failed to send agreement via DocuSign');
-        }
-    
-        // Save consent record
-        const consent = new Consent({
-            patientId: patient._id,
-            envelopeId: results.envelopeId,
+
+        const updatedPatient = await addConsentToPatient(patient._id, {
+            envelopeId: envelope.envelopeId,
             templateId,
             sentBy: req.session.userId,
-            department: req.user?.department || 'General',
             status: 'sent',
+            department: req.user?.department || 'General',
             sentAt: new Date()
         });
-        await consent.save();
     
         res.json({
-            envelopeId: results.envelopeId,
-            status: results.status,
-            statusDateTime: results.statusDateTime
+            success: true,
+            envelopeId: envelope.envelopeId,
+            patient: updatedPatient
         });
     } catch (err) {
         console.error('Error while sending agreement:', err);
@@ -120,6 +99,41 @@ router.get('/agreements/:envelopeId/status', checkAuth, async (req, res) => {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // POST agreement status
+  router.post('/agreements/:envelopeId/status', async (req, res) => {
+    try {
+      const { envelopeId } = req.params;
+      const { status, patientId } = req.body;
+  
+      const completedAt = status === 'signed' ? new Date() : null;
+  
+      const updatedPatient = await updateConsentStatus(patientId, envelopeId, status, completedAt);
+  
+      if (!updatedPatient) {
+        return res.status(404).json({ error: 'Consent not found' });
+      }
+  
+      res.json({ success: true, updatedPatient });
+    } catch (error) {
+      console.error('Error updating consent status:', error.message);
+      res.status(500).json({ error: 'Failed to update consent status' });
+    }
+  });
+// Fetch all consents for a patient
+
+router.get('/patients/:patientId/consents', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    const consents = await getPatientConsents(patientId);
+
+    res.json(consents);
+  } catch (error) {
+    console.error('Error fetching consents:', error.message);
+    res.status(500).json({ error: 'Failed to fetch consents' });
+  }
+});
 
  //////////////////
 // upload feature

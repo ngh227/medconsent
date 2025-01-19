@@ -2,35 +2,31 @@
 const mongoose = require('mongoose');
 
 const consentSchema = new mongoose.Schema({
-  // Links to the patient
   patientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',  // References User model
+    ref: 'User',
     required: true
   },
 
-  // DocuSign specific fields
   envelopeId: {
     type: String,
-    required: true,
-    unique: true  // Each DocuSign envelope should be unique
+    required: true
+    // removed 'unique: true'
   },
   templateId: {
     type: String,
     required: true
   },
 
-  // Consent status
   status: {
     type: String,
     enum: ['sent', 'signed', 'declined', 'expired'],
     default: 'sent'
   },
 
-  // Staff who sent the consent
   sentBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',  // References User model (staff)
+    ref: 'User',
     required: true
   },
   department: {
@@ -38,7 +34,6 @@ const consentSchema = new mongoose.Schema({
     required: true
   },
 
-  // Timestamps
   sentAt: {
     type: Date,
     default: Date.now
