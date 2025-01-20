@@ -48,7 +48,7 @@ router.get('/staff/session-check', (req, res) => {
 
 
 // get all patients (need to add checkRole('staff') middleware)
-router.get('/staff/patients', [checkAuth], async (req, res) => {
+router.get('/staff/patients', checkStaffAuth, async (req, res) => {
     try {
         const { 
             search, 
@@ -109,7 +109,7 @@ router.get('/staff/patients/:patientId', checkStaffAuth, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-// NOT WORKING
+// WORKED 
 router.get('/staff/patients/:patientId/consents', checkStaffAuth, async (req, res) => {
     try {
         const consents = await EnvelopeService.getConsentHistory(req.params.patientId);
@@ -118,33 +118,8 @@ router.get('/staff/patients/:patientId/consents', checkStaffAuth, async (req, re
         res.status(500).json({ error: error.message });
     }
 });
-// TEST:
-// routes/api/staff.routes.js
-router.get('/staff/debug/all-consents', async (req, res) => {
-    try {
-        const consents = await Consent.find({})
-            .populate('patientId')
-            .populate('sentBy');
-
-        // Map consents to show relevant data
-        const mappedConsents = consents.map(consent => ({
-            _id: consent._id,
-            envelopeId: consent.envelopeId,
-            patientId: consent.patientId,
-            status: consent.status,
-            sentAt: consent.sentAt,
-            department: consent.department
-        }));
-
-        res.json({
-            totalConsents: consents.length,
-            consents: mappedConsents
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-router.get('/staff/templates', [checkAuth, checkRole('staff')], async (req, res) => {
+// WORKED
+router.get('/staff/templates', checkStaffAuth, async (req, res) => {
     try {
         const templates = await TemplateService.listTemplates(
             req.session.accountId,
@@ -156,44 +131,64 @@ router.get('/staff/templates', [checkAuth, checkRole('staff')], async (req, res)
     }
 });
 
-
-router.post('/staff/consents/send', [checkAuth, checkRole('staff')], async (req, res) => {
+/**
+ * 
+ */
+router.post('/staff/consents/send', checkStaffAuth, async (req, res) => {
     try {
-        const { patientId, templateId } = req.body;
+        const { recipientEmail, recipientName, templateId } = req.body;
+        const { accountId, accessToken, userId } = req.session;
 
-        const patient = await User.findById(patientId);
-        if (!patient) {
-            return res.status(404).json({ error: 'Patient not found' });
+        // Validate inputs
+        if (!recipientEmail || !recipientName || !templateId) {
+            return res.status(400).json({
+                error: 'Missing required information'
+            });
         }
 
+        // Find or create patient
+        let patient = await User.findOne({ email: recipientEmail, role: 'patient' });
+        if (!patient) {
+            patient = await User.create({
+                email: recipientEmail,
+                name: recipientName,
+                role: 'patient'
+            });
+        }
+
+        // Create envelope
         const envelope = await EnvelopeService.createEnvelope(
-            req.session.accountId,
+            accountId,
             templateId,
-            patient.email,
-            patient.name,
-            req.session.accessToken
+            recipientEmail,
+            recipientName,
+            accessToken
         );
-        const savedConsent = await EnvelopeService.saveConsentDetails(
-            {
-                envelopeId: envelope.envelopeId,
-                templateId,
-                sentBy: req.session.userId,
-                department: req.user?.department || 'General'
-            },
-            patient
-        );
+
+        // Save consent
+        const savedConsent = await EnvelopeService.saveConsentDetails({
+            envelopeId: envelope.envelopeId,
+            templateId,
+            sentBy: userId,
+            department: 'General'
+        }, patient);
 
         res.json({
             success: true,
             envelope,
-            consent: savedConsent
+            consent: savedConsent,
+            patient
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Error sending consent:', error);
+        res.status(500).json({
+            error: 'Cannot send consent',
+            details: error.message
+        });
     }
 });
 
-router.get('/staff/consents/:consentId/status', [checkAuth, checkRole('staff')], async (req, res) => {
+router.get('/staff/consents/:consentId/status', checkStaffAuth, async (req, res) => {
     try {
         const consent = await Consent.findById(req.params.consentId)
             .populate('patientId', 'name email')

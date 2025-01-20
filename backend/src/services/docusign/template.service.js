@@ -13,13 +13,30 @@ class TemplateService {
     }
 
     async listTemplates(accountId, accessToken) {
-        const templatesApi = this.initializeClient(accessToken);
-        const options = {
-            searchText: 'Consent',
-            orderBy: 'name DESC'
-        };
-        return await templatesApi.listTemplates(accountId, options);
+        try {
+            console.log('Listing templates for account:', accountId);
+            
+            const templatesApi = this.initializeClient(accessToken);
+            
+            // Simplified options first to test basic functionality
+            const options = {
+                searchText: null,  // Remove search filter initially
+                orderBy: null     // Remove ordering initially
+            };
+
+            const response = await templatesApi.listTemplates(accountId, options);
+            console.log('Templates response:', response);
+            return response;
+        } catch (error) {
+            console.error('Template listing error details:', {
+                message: error.message,
+                response: error.response?.body,
+                status: error.response?.status
+            });
+            throw error;
+        }
     }
+
 
     async createTemplate(accountId, accessToken, templateData) {
         const templatesApi = this.initializeClient(accessToken);

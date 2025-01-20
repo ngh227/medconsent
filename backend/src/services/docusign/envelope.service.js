@@ -17,7 +17,6 @@ class EnvelopeService {
     }
 
     async createEnvelope(accountId, templateId, recipientEmail, recipientName, accessToken) {
-        // accessToken added as parameter ^^^^^^^^^^^^^^
         const envelopeDefinition = new docusign.EnvelopeDefinition();
         envelopeDefinition.templateId = templateId;
 
@@ -64,24 +63,6 @@ class EnvelopeService {
             console.log('Saved consent:', savedConsent);
 
             // await User.findByIdAndUpdate(
-            //     patientData._id,
-            //     { $push: { consents: consent._id } }
-            // );
-
-            // await Template.findOneAndUpdate(
-            //     { docusignTemplateId: envelopeData.templateId },
-            //     {
-            //         $inc: { usageCount: 1 },
-            //         $push: {
-            //             usageHistory: {
-            //                 envelopeId: envelopeData.envelopeId,
-            //                 usedAt: new Date(),
-            //                 department: envelopeData.department
-            //             }
-            //         }
-            //     },
-            //     { upsert: true}
-            // );
             return savedConsent;
         } catch (error) {
             console.error('Error while saving consent details:', error);
