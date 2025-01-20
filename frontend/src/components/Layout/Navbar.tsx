@@ -6,35 +6,30 @@ const Navbar = () => {
   const location = useLocation();
 
   const getLinkClass = (path: string) => {
+    const baseClasses = "px-3 py-2 rounded-md text-sm font-medium";
     return location.pathname === path
-      ? 'text-blue-600'
-      : 'text-gray-700 hover:text-blue-600';
+      ? `${baseClasses} bg-gray-900 text-white`
+      : `${baseClasses} text-gray-700 hover:bg-gray-700 hover:text-white`;
   };
 
   return (
     <nav className="bg-white shadow-lg">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Link to="/staff/dashboard" className="text-xl font-bold text-gray-800">
-            Medical Consent
-          </Link>
-          <div className="flex items-center space-x-8">
-            <Link
-              to="/staff/dashboard"
-              className={getLinkClass('/staff/dashboard')}
-            >
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link to="/staff/dashboard" className="flex-shrink-0 flex items-center">
+              <span className="text-xl font-bold text-gray-800">Medical Consent</span>
+            </Link>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <Link to="/staff/dashboard" className={getLinkClass('/staff/dashboard')}>
               Dashboard
             </Link>
-            <Link
-              to="/staff/send"
-              className={getLinkClass('/staff/send')}
-            >
+            <Link to="/staff/send" className={getLinkClass('/staff/send')}>
               New Agreement
             </Link>
-            <Link
-              to="/staff/status"
-              className={getLinkClass('/staff/status')}
-            >
+            <Link to="/staff/status" className={getLinkClass('/staff/status')}>
               Check Status
             </Link>
           </div>
